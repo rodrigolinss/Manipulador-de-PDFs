@@ -1,3 +1,6 @@
+
+![Manipulador de PDF](banner.png)
+
 # Manipulador de PDF  
 Uma aplicação web simples e eficiente para manipulação de arquivos PDF, desenvolvida com Python e Streamlit.
 
