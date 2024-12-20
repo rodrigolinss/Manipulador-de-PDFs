@@ -12,6 +12,5 @@ Uma aplicação web simples e eficiente para manipulação de arquivos PDF, dese
 ## Tecnologias Utilizadas  
 - **Python**: Linguagem principal do projeto.  
 - **Streamlit**: Framework para construção da interface web.  
-- **PyPDF2**: Manipulação básica de arquivos PDF (juntar e dividir).  
-- **PyMuPDF (fitz)**: Compressão real de arquivos PDF.  
-- **Pillow**: Processamento de imagens para compressão. 
+- **PyPDF2**: Manipulação de arquivos PDF (juntar e dividir).  
+- **Ghostscript**: Utilizado para compressão eficiente de arquivos PDF.  
