@@ -1,10 +1,14 @@
-
 import streamlit as st
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
-import fitz  # PyMuPDF
-from PIL import Image
-from io import BytesIO
+import time
+
 import os
+
+# -- comprimir -- 
+
+import subprocess
+
+
 
 def aplicar_estilo():
     estilo = """
@@ -29,61 +33,84 @@ def aplicar_estilo():
     </style>
     """
     st.markdown(estilo, unsafe_allow_html=True)
-
 aplicar_estilo()
 
 
 def juntar_pdfs(arquivos):
     merger = PdfMerger()
+
     for arquivo in arquivos:
         merger.append(arquivo)
     caminho_saida = "pdf_juntado.pdf"
     merger.write(caminho_saida)
     merger.close()
+
     return caminho_saida
 
 
-def dividir_pdf(arquivo):
+def dividir_pdf(arquivo, num_partes):
     leitor = PdfReader(arquivo)
+    total_paginas = len(leitor.pages)
+
+    # verificacao divisao
+    if num_partes > total_paginas or num_partes < 1:
+        return None, total_paginas
+
+    paginas_por_parte = total_paginas // num_partes
+    resto = total_paginas % num_partes
     arquivos_saida = []
-    for i, pagina in enumerate(leitor.pages):
+
+    nome_arquivo_original = os.path.basename(arquivo.name) 
+    primeira_palavra = nome_arquivo_original.split()[0].split('.')[0]  # pega a primeira palavra do arquivo original
+
+    inicio = 0
+    for i in range(num_partes):
         escritor = PdfWriter()
-        escritor.add_page(pagina)
-        nome_arquivo = f"pagina_{i + 1}.pdf"
+        fim = inicio + paginas_por_parte + (1 if i < resto else 0)
+        for pagina in range(inicio, fim):
+            escritor.add_page(leitor.pages[pagina])
+        nome_arquivo = f"{primeira_palavra}_parte_{i + 1}.pdf"
         with open(nome_arquivo, "wb") as f:
             escritor.write(f)
         arquivos_saida.append(nome_arquivo)
-    return arquivos_saida
+        inicio = fim
 
-# Função para comprimir PDF com compressão real
-def comprimir_pdf(arquivo, qualidade=50):
-    documento = fitz.open(arquivo)
-    caminho_saida = "pdf_comprimido.pdf"
-
-    for pagina in documento:  # Itera pelas páginas
-        imagens = pagina.get_images(full=True)  # Obtém todas as imagens
-        for img_index, img in enumerate(imagens):
-            xref = img[0]  # Referência da imagem no PDF
-            base_image = documento.extract_image(xref)  # Extrai a imagem
-            imagem_bytes = base_image["image"]
-
-            # Converte para uma imagem mais compacta
-            imagem = Image.open(BytesIO(imagem_bytes))
-            buffer = BytesIO()
-            imagem.save(buffer, format="JPEG", quality=qualidade)  # Ajusta a qualidade
-            buffer.seek(0)
-
-            # Substitui a imagem original pela comprimida
-            documento.update_image(xref, buffer.read())
-
-    # Salva o PDF comprimido
-    documento.save(caminho_saida, deflate=True)  # `deflate=True` ajuda a reduzir mais
-    documento.close()
-    return caminho_saida
+    return arquivos_saida, total_paginas
 
 
+def comprimir_pdf(input_pdf, output_pdf):
+    try:
+        # Caminho completo para o Ghostscript
+        gs_path = r"C:\Program Files\gs\gs10.04.0\bin\gswin64c.exe"  # Verifique o caminho correto na sua máquina
 
- 
+        comando = [
+            gs_path,  # Use o caminho completo para o Ghostscript
+            '-sDEVICE=pdfwrite',
+            '-dCompatibilityLevel=1.4',
+            '-dPDFSETTINGS=/screen',
+            '-dNOPAUSE',
+            '-dQUIET',
+            '-dBATCH',
+            f'-sOutputFile={output_pdf}',
+            input_pdf
+        ]
+        
+        # Executa o comando no sistema
+        subprocess.run(comando, check=True)
+        print(f"PDF comprimido com sucesso: {output_pdf}")
+        
+        # Retorna os tamanhos do arquivo original e comprimido
+        tamanho_original = os.path.getsize(input_pdf) / (1024 * 1024)  # MB
+        tamanho_comprimido = os.path.getsize(output_pdf) / (1024 * 1024)  # MB
+        
+        return tamanho_original, tamanho_comprimido
+    
+    except subprocess.CalledProcessError as e:
+        print(f"Erro ao processar o PDF: {e}")
+        return None, None
+
+
+
 
 # Interface do Streamlit
 
@@ -104,32 +131,46 @@ if opcao == "Juntar PDFs":
         else:
             st.error("Envie pelo menos dois arquivos PDF.")
 
-elif opcao == "Dividir PDF":
-    st.header("Dividir PDF")
-    arquivo = st.file_uploader("Envie o arquivo PDF que deseja dividir", type="pdf")
-    if st.button("Dividir"):
-        if arquivo:
-            arquivos_saida = dividir_pdf(arquivo)
-            st.success("PDF dividido com sucesso!")
-            for nome_arquivo in arquivos_saida:
-                with open(nome_arquivo, "rb") as f:
-                    st.download_button(f"Baixar {nome_arquivo}", f, file_name=nome_arquivo)
-                os.remove(nome_arquivo)
-        else:
-            st.error("Envie um arquivo PDF.")
-
 elif opcao == "Comprimir PDF":
     st.header("Comprimir PDF")
-    st.sidebar.write("Reduza o tamanho do seu PDF ajustando a qualidade das imagens.")
-    qualidade = st.sidebar.slider("Qualidade da imagem (1-100)", min_value=1, max_value=100, value=50)
+    
+    arquivo = st.file_uploader("Envie o arquivo PDF que deseja comprimir", type="pdf", key="comprimir_pdf_uploader")
+    
+    if arquivo is not None:
+        nome_original = arquivo.name
+        primeira_palavra = nome_original.split()[0]
+        caminho_entrada = "temp_pdf.pdf"
+        caminho_saida = f"{primeira_palavra}_comprimido.pdf"
+        
+        # salva o arquivo temporariamente
+        with open(caminho_entrada, "wb") as f:
+            f.write(arquivo.read())
 
-    arquivo = st.file_uploader("Envie o arquivo PDF que deseja comprimir", type="pdf")
-    if st.button("Comprimir"):
-        if arquivo:
-            caminho_saida = comprimir_pdf(arquivo, qualidade)
-            st.success("PDF comprimido com sucesso!")
-            with open(caminho_saida, "rb") as f:
-                st.download_button("Baixar PDF Comprimido", f, file_name="pdf_comprimido.pdf")
-            os.remove(caminho_saida)
-        else:
-            st.error("Envie um arquivo PDF para comprimir.")
+        # Comprimir o arquivo
+        if st.button("Comprimir"):
+            with st.spinner("Comprimindo o PDF... Isso pode levar algum tempo."):
+                try:
+                    # Chama a função de compressão
+                    comprimir_pdf(caminho_entrada, caminho_saida)
+
+                    # Exibe os resultados após a compressão
+                    st.success(f"PDF comprimido com sucesso!")
+
+                    # Exibe o tamanho original e comprimido
+                    tamanho_original = os.path.getsize(caminho_entrada) / (1024 * 1024)  # em MB
+                    tamanho_comprimido = os.path.getsize(caminho_saida) / (1024 * 1024)  # em MB
+                    st.write(f"Tamanho original: {tamanho_original:.2f} MB")
+                    st.write(f"Tamanho comprimido: {tamanho_comprimido:.2f} MB")
+
+                    # Botão para download do arquivo comprimido
+                    with open(caminho_saida, "rb") as f:
+                        st.download_button("Baixar PDF Comprimido", f, file_name=caminho_saida)
+
+                    # Remove os arquivos temporários
+                    os.remove(caminho_entrada)
+                    os.remove(caminho_saida)
+
+                except Exception as e:
+                    st.error(f"Erro ao processar o PDF: {e}")
+    else:
+        st.error("Envie um arquivo PDF para comprimir.")
