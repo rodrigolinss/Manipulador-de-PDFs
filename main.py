@@ -48,20 +48,21 @@ def juntar_pdfs(arquivos):
     return caminho_saida
 
 
+@st.cache_data
 def dividir_pdf(arquivo, num_partes):
     leitor = PdfReader(arquivo)
     total_paginas = len(leitor.pages)
 
-    # verificacao divisao
+    # Verificação de divisão
     if num_partes > total_paginas or num_partes < 1:
         return None, total_paginas
 
     paginas_por_parte = total_paginas // num_partes
     resto = total_paginas % num_partes
-    arquivos_saida = []
+    arquivos_saida = {}
 
     nome_arquivo_original = os.path.basename(arquivo.name) 
-    primeira_palavra = nome_arquivo_original.split()[0].split('.')[0]  # pega a primeira palavra do arquivo original
+    primeira_palavra = nome_arquivo_original.split()[0].split('.')[0]  # Pega a primeira palavra do arquivo original
 
     inicio = 0
     for i in range(num_partes):
@@ -72,10 +73,13 @@ def dividir_pdf(arquivo, num_partes):
         nome_arquivo = f"{primeira_palavra}_parte_{i + 1}.pdf"
         with open(nome_arquivo, "wb") as f:
             escritor.write(f)
-        arquivos_saida.append(nome_arquivo)
+        with open(nome_arquivo, "rb") as f:
+            arquivos_saida[nome_arquivo] = f.read()
+        os.remove(nome_arquivo)
         inicio = fim
 
     return arquivos_saida, total_paginas
+
 
 
 def comprimir_pdf(input_pdf, output_pdf):
@@ -118,6 +122,7 @@ st.title("Manipulador de PDFs")
 st.sidebar.title("Opções")
 opcao = st.sidebar.selectbox("Escolha uma ação", ["Juntar PDFs", "Dividir PDF", "Comprimir PDF"])
 
+
 if opcao == "Juntar PDFs":
     st.header("Juntar PDFs")
     arquivos = st.file_uploader("Envie os arquivos PDF que deseja juntar", type="pdf", accept_multiple_files=True)
@@ -130,6 +135,42 @@ if opcao == "Juntar PDFs":
             os.remove(caminho_saida)
         else:
             st.error("Envie pelo menos dois arquivos PDF.")
+
+
+elif opcao == "Dividir PDF":
+    st.header("Dividir PDF")
+    arquivo = st.file_uploader("Envie o arquivo PDF que deseja dividir", type="pdf")
+
+    if arquivo:
+        leitor = PdfReader(arquivo)
+        total_paginas = len(leitor.pages)
+
+        # Input para o número de partes
+        num_partes = st.number_input(
+            "Escolha em quantas partes deseja dividir o PDF",
+            min_value=1,
+            max_value=total_paginas,
+            value=2,
+            step=1,
+            key="num_partes_input"
+        )
+
+        if st.button("Dividir"):
+            try:
+                arquivos_saida, _ = dividir_pdf(arquivo, num_partes)
+                st.success("PDF dividido com sucesso!")
+                for nome_arquivo, conteudo in arquivos_saida.items():
+                    st.download_button(
+                        f"Baixar {nome_arquivo}",
+                        data=conteudo,
+                        file_name=nome_arquivo
+                    )
+            except Exception as e:
+                st.error(f"Erro ao dividir o PDF: {e}")
+    else:
+        st.error("Envie um arquivo PDF.")
+
+
 
 elif opcao == "Comprimir PDF":
     st.header("Comprimir PDF")
