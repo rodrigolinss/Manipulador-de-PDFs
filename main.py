@@ -1,14 +1,16 @@
 import streamlit as st
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
 import time
-
 import os
 
-# -- comprimir -- 
-
+# -- comprimir (Ghostscript)
 import subprocess
 
 
+st.set_page_config(
+    page_title="Manipulador de PDFs",
+    page_icon="icon.png"
+)
 
 def aplicar_estilo():
     estilo = """
@@ -81,7 +83,6 @@ def dividir_pdf(arquivo, num_partes):
     return arquivos_saida, total_paginas
 
 
-
 def comprimir_pdf(input_pdf, output_pdf):
     try:
         # Caminho completo para o Ghostscript
@@ -114,9 +115,8 @@ def comprimir_pdf(input_pdf, output_pdf):
         return None, None
 
 
-
-
 # Interface do Streamlit
+
 
 st.title("Manipulador de PDFs")
 st.sidebar.title("Opções")
@@ -169,7 +169,6 @@ elif opcao == "Dividir PDF":
                 st.error(f"Erro ao dividir o PDF: {e}")
     else:
         st.error("Envie um arquivo PDF.")
-
 
 
 elif opcao == "Comprimir PDF":
