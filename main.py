@@ -12,6 +12,7 @@ st.set_page_config(
     page_icon="icon.png"
 )
 
+
 def aplicar_estilo():
     estilo = """
     <style>
@@ -38,11 +39,11 @@ def aplicar_estilo():
 aplicar_estilo()
 
 
-def juntar_pdfs(arquivos):
+def juntar_pdfs(arquivos, ordem):
     merger = PdfMerger()
 
-    for arquivo in arquivos:
-        merger.append(arquivo)
+    for indice in ordem:
+        merger.append(arquivos[indice])
     caminho_saida = "pdf_juntado.pdf"
     merger.write(caminho_saida)
     merger.close()
@@ -126,15 +127,39 @@ opcao = st.sidebar.selectbox("Escolha uma ação", ["Juntar PDFs", "Dividir PDF"
 if opcao == "Juntar PDFs":
     st.header("Juntar PDFs")
     arquivos = st.file_uploader("Envie os arquivos PDF que deseja juntar", type="pdf", accept_multiple_files=True)
-    if st.button("Juntar"):
-        if arquivos and len(arquivos) > 1:
-            caminho_saida = juntar_pdfs(arquivos)
+
+    if arquivos:
+        st.write("**Defina a ordem desejada para juntar os PDFs:**")
+        # Interface para ordenar arquivos
+        nomes_arquivos = [arquivo.name for arquivo in arquivos]
+        ordem = [i + 1 for i in range(len(nomes_arquivos))]  # Ordem inicial padrão
+
+        for i, nome in enumerate(nomes_arquivos):
+            nova_posicao = st.number_input(
+                f"Posição para '{nome}'", 
+                min_value=1, 
+                max_value=len(arquivos), 
+                value=ordem[i], 
+                step=1, 
+                key=f"posicao_{i}"
+            )
+            # Ajustar a posição para evitar duplicados
+            if nova_posicao in ordem and nova_posicao != ordem[i]:
+                conflito_idx = ordem.index(nova_posicao)
+                ordem[conflito_idx] = ordem[i]  # Troca a posição conflitante
+            ordem[i] = nova_posicao
+
+        # Ajustar a ordem para índices corretos
+        ordem_final = [ordem.index(i + 1) for i in range(len(ordem))]
+
+        if st.button("Juntar"):
+            caminho_saida = juntar_pdfs(arquivos, ordem_final)
             st.success("PDFs juntados com sucesso!")
             with open(caminho_saida, "rb") as f:
                 st.download_button("Baixar PDF Juntado", f, file_name="pdf_juntado.pdf")
             os.remove(caminho_saida)
-        else:
-            st.error("Envie pelo menos dois arquivos PDF.")
+    else:
+        st.info("Envie os arquivos PDF para começar.")
 
 
 elif opcao == "Dividir PDF":
