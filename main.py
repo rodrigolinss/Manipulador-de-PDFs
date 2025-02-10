@@ -3,7 +3,7 @@ from PyPDF2 import PdfMerger, PdfReader, PdfWriter
 import time
 import os
 
-# -- comprimir (Ghostscript)
+# --- Comprimir (Ghostscript)
 import subprocess
 
 
@@ -117,7 +117,6 @@ def comprimir_pdf(input_pdf, output_pdf):
 
 
 # Interface do Streamlit
-
 
 st.title("Manipulador de PDFs")
 st.sidebar.title("Opções")
